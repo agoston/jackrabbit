@@ -25,27 +25,18 @@ public final class Application {
         Session session = repository.login(username, password);
         Node rootNode = session.getRootNode();
 
-        // TODO: have a runtimeexception version of Node; we can't even put the nodeId in an exception message like this
-        StreamSupport.stream(Spliterators.spliteratorUnknownSize(TreeTraverser.nodeIterator(rootNode), 0), true)
-                .filter(node -> {
-                    try {
-                        return node.getIdentifier().contains("cafe");   // TODO: confirm that uuid is forced lowercase
-                    } catch (RepositoryException e) {
-                        throw new RuntimeException(e);
-                    }
-                })
-                .forEach(node -> {
-                    try {
-                        System.out.println(node.getPath() + ": " + node.getIdentifier());
-                        for (PropertyIterator it = node.getProperties(); it.hasNext(); ) {
-                            Property property = it.nextProperty();
-                            System.out.println("\t\t" + property.getName() + " = " + StringUtils.join(property.getValues(), ", "));
-                        }
-                    } catch (RepositoryException e) {
-                        throw new RuntimeException(e);
-                    }
-                });
+        for (Iterator<Node> it = TreeTraverser.nodeIterator(rootNode.getNode("content")); it.hasNext(); ) {
+            Node node = it.next();
+            if (node.getIdentifier().startsWith("cafeface")) continue;
 
+            System.out.println(node.getPath() + ": " + node.getIdentifier());
 
+            for (PropertyIterator pi = node.getProperties(); pi.hasNext(); ) {
+                Property property = pi.nextProperty();
+
+                System.out.println("\t\t" + property.getName() + "[" + PropertyType.nameFromValue(property.getType()) + "] = " +
+                        (property.isMultiple() ? StringUtils.join(property.getValues(), ", ") : property.getValue()));
+            }
+        }
     }
 }
