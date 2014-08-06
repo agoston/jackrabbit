@@ -2,8 +2,13 @@ package org.onehippo.assessment;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.jackrabbit.commons.flat.TreeTraverser;
+import org.apache.jackrabbit.ocm.manager.ObjectContentManager;
+import org.apache.jackrabbit.ocm.manager.impl.ObjectContentManagerImpl;
+import org.apache.jackrabbit.ocm.mapper.Mapper;
+import org.apache.jackrabbit.ocm.mapper.impl.annotation.AnnotationMapperImpl;
 import org.hippoecm.repository.HippoRepository;
 import org.hippoecm.repository.HippoRepositoryFactory;
+import org.onehippo.assessment.domain.Book;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,6 +20,7 @@ import javax.jcr.observation.ObservationManager;
 import javax.jcr.query.Query;
 import javax.jcr.query.QueryManager;
 import javax.jcr.query.QueryResult;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -66,8 +72,30 @@ public final class Application {
 //        showcaseQuery(session);
 //        showcaseObservation(session);
 
+        if (!rootNode.hasNode("books")) {
+            rootNode.addNode("books");
+            session.save();
+        }
+
+        showcaseOCM(session);
+
+
+
         session.logout();
 
+    }
+
+    private static void showcaseOCM(Session session) {
+        Mapper mapper = new AnnotationMapperImpl(Arrays.asList(Book.class));
+        ObjectContentManager ocm = new ObjectContentManagerImpl(session, mapper);
+
+        Book myBook = new Book("/books/ohmy", "Mary Author", "123456789-1", "Oh, my book!");
+        ocm.insert(myBook);
+        ocm.save();
+
+        Book retrieved = (Book)ocm.getObject("/books/ohmy");
+
+        if (myBook.equals(retrieved)) System.err.println("Oh, my book was found!");
     }
 
     private static void showcaseObservation(Session session) throws RepositoryException, InterruptedException {
