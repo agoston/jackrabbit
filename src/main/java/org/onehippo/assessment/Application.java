@@ -45,7 +45,6 @@ public final class Application {
         }
     }
 
-    // TODO: check if repo supports query
     private static void showcaseQuery(final Session session) throws RepositoryException {
         QueryManager queryManager = session.getWorkspace().getQueryManager();
         Query query = queryManager.createQuery("SELECT a.* FROM [nt:base] AS a WHERE CONTAINS(a.*, 'Files')", Query.JCR_SQL2);
@@ -99,7 +98,6 @@ public final class Application {
     }
 
     private static void showcaseObservation(Session session) throws RepositoryException, InterruptedException {
-        // TODO: check if repo supports observations
         ObservationManager observationManager = session.getWorkspace().getObservationManager();
         NodeEventListener listener = new NodeEventListener();
         observationManager.addEventListener(listener, Event.NODE_ADDED | Event.NODE_MOVED | Event.NODE_REMOVED, "/content", true, null, null, false);
