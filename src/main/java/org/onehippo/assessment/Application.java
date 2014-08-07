@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public final class Application {
 
@@ -76,8 +77,7 @@ public final class Application {
             session.save();
         }
 
-        showcaseOCM(session);
-
+//        showcaseOCM(session);
 
 
         session.logout();
@@ -92,18 +92,26 @@ public final class Application {
         ocm.insert(myBook);
         ocm.save();
 
-        Book retrieved = (Book)ocm.getObject("/books/ohmy");
+        Book retrieved = (Book) ocm.getObject("/books/ohmy");
 
         if (myBook.equals(retrieved)) System.err.println("Oh, my book was found!");
     }
 
     private static void showcaseObservation(Session session) throws RepositoryException, InterruptedException {
         ObservationManager observationManager = session.getWorkspace().getObservationManager();
-        NodeEventListener listener = new NodeEventListener();
+
+        NodeEventListener listener = new NodeEventListener(event -> {
+            try {
+                System.err.println(event.getPath() + " " + formatEventType(event.getType()));
+            } catch (RepositoryException e) {
+                LOGGER.error("Listener", e);
+            }
+        });
+
         observationManager.addEventListener(listener, Event.NODE_ADDED | Event.NODE_MOVED | Event.NODE_REMOVED, "/content", true, null, null, false);
 
         System.err.println("Now waiting...");
-        listener.await();
+        listener.await(2);
 
         observationManager.removeEventListener(listener);
     }
@@ -122,24 +130,25 @@ public final class Application {
     }
 
     private static class NodeEventListener implements EventListener {
-        private static CountDownLatch observationFinished = new CountDownLatch(2);
+        private static final CountDownLatch DEFAULT = new CountDownLatch(0);
+
+        private CountDownLatch observationFinished = DEFAULT;
+        private final Consumer<Event> consumer;
+
+        public NodeEventListener(Consumer<Event> consumer) {
+            this.consumer = consumer;
+        }
 
         @Override
         public void onEvent(EventIterator events) {
             while (events.hasNext()) {
-                try {
-                    Event event = events.nextEvent();
-
-                    // TODO: event.getDate() should be implemented
-                    System.err.println(event.getPath() + " " + formatEventType(event.getType()));
-                    observationFinished.countDown();
-                } catch (RepositoryException e) {
-                    LOGGER.error("Listener", e);
-                }
+                consumer.accept(events.nextEvent());
+                observationFinished.countDown();
             }
         }
 
-        public void await() {
+        public void await(int numEvents) {
+            observationFinished = new CountDownLatch(numEvents);
             try {
                 observationFinished.await();
             } catch (InterruptedException e) {
