@@ -2,9 +2,10 @@ package org.onehippo.assessment.domain;
 
 import org.apache.jackrabbit.ocm.mapper.impl.annotation.Field;
 import org.apache.jackrabbit.ocm.mapper.impl.annotation.Node;
+import org.onehippo.assessment.Refreshable;
 
 @Node
-public class Book {
+public class Book implements Refreshable {
     @Field(path=true) String path;
 
     @Field String author;
@@ -69,5 +70,13 @@ public class Book {
     @Override
     public int hashCode() {
         return path.hashCode();
+    }
+
+    @Override
+    public void refresh(Object fresh) {
+        Book o = (Book)fresh;
+        this.author = o.author;
+        this.isbn = o.isbn;
+        this.title = o.title;
     }
 }

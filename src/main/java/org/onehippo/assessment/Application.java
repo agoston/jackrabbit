@@ -23,7 +23,6 @@ import javax.jcr.query.QueryResult;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public final class Application {
@@ -59,6 +58,69 @@ public final class Application {
         }
     }
 
+    private static void showcaseObservation(Session session) throws RepositoryException, InterruptedException {
+        ObservationManager observationManager = session.getWorkspace().getObservationManager();
+
+        NodeEventListener listener = new NodeEventListener(event -> {
+            try {
+                System.err.println(event.getPath() + " " + formatEventType(event.getType()));
+            } catch (RepositoryException e) {
+                LOGGER.error("Listener", e);
+            }
+        });
+
+        observationManager.addEventListener(listener, Event.NODE_ADDED | Event.NODE_MOVED | Event.NODE_REMOVED, "/content", true, null, null, false);
+
+        System.err.println("Now waiting...");
+        listener.await(2);
+
+        observationManager.removeEventListener(listener);
+    }
+
+    private static void showcaseOCM(Session session) {
+        Mapper mapper = new AnnotationMapperImpl(Arrays.asList(Book.class));
+        ObjectContentManager ocm = new ObjectContentManagerImpl(session, mapper);
+
+        Book myBook = new Book("/books/ohmy", "Mary Author", "123456789-1", "Oh, my book!");
+        ocm.insert(myBook);
+        ocm.save();
+
+        Book retrieved = (Book) ocm.getObject("/books/ohmy");
+
+        if (myBook.equals(retrieved)) System.err.println("Oh, my book was found!");
+        else System.err.println("Wrong book!");
+    }
+
+    private static void showcaseSync(Session session) throws RepositoryException, InterruptedException {
+        Mapper mapper = new AnnotationMapperImpl(Arrays.asList(Book.class));
+        ObjectContentManager ocm = new ObjectContentManagerImpl(session, mapper);
+
+        ObservationManager observationManager = session.getWorkspace().getObservationManager();
+
+        NodeSynchronizer nodeSynchronizer = new NodeSynchronizer(ocm);
+
+        Book b1 = (Book) ocm.getObject("/books/ohmy");
+        Book b2 = (Book) ocm.getObject("/books/ohmy");
+        Book b3 = (Book) ocm.getObject("/books/ohmy");
+
+        nodeSynchronizer.register("/books/ohmy", b1);
+        nodeSynchronizer.register("/books/ohmy", b2);
+        nodeSynchronizer.register("/books/ohmy", b3);
+
+        observationManager.addEventListener(nodeSynchronizer, Event.PROPERTY_ADDED | Event.PROPERTY_CHANGED | Event.PROPERTY_REMOVED, "/books", true, null, null, false);
+
+        b1.setAuthor("meh");
+        ocm.update(b1);
+        ocm.save();
+
+        Thread.sleep(2000);
+
+        System.err.println(b2.getAuthor());
+        System.err.println(b3.getAuthor());
+
+        observationManager.removeEventListener(nodeSynchronizer);
+    }
+
     public static void main(String[] args) throws Exception {
         String repoUrl = "rmi://localhost:1099/hipporepository";
         String username = "admin";
@@ -77,43 +139,11 @@ public final class Application {
             session.save();
         }
 
-//        showcaseOCM(session);
-
+        showcaseOCM(session);
+        showcaseSync(session);
 
         session.logout();
 
-    }
-
-    private static void showcaseOCM(Session session) {
-        Mapper mapper = new AnnotationMapperImpl(Arrays.asList(Book.class));
-        ObjectContentManager ocm = new ObjectContentManagerImpl(session, mapper);
-
-        Book myBook = new Book("/books/ohmy", "Mary Author", "123456789-1", "Oh, my book!");
-        ocm.insert(myBook);
-        ocm.save();
-
-        Book retrieved = (Book) ocm.getObject("/books/ohmy");
-
-        if (myBook.equals(retrieved)) System.err.println("Oh, my book was found!");
-    }
-
-    private static void showcaseObservation(Session session) throws RepositoryException, InterruptedException {
-        ObservationManager observationManager = session.getWorkspace().getObservationManager();
-
-        NodeEventListener listener = new NodeEventListener(event -> {
-            try {
-                System.err.println(event.getPath() + " " + formatEventType(event.getType()));
-            } catch (RepositoryException e) {
-                LOGGER.error("Listener", e);
-            }
-        });
-
-        observationManager.addEventListener(listener, Event.NODE_ADDED | Event.NODE_MOVED | Event.NODE_REMOVED, "/content", true, null, null, false);
-
-        System.err.println("Now waiting...");
-        listener.await(2);
-
-        observationManager.removeEventListener(listener);
     }
 
     private static final String formatEventType(int eventType) {
